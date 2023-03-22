@@ -1,7 +1,7 @@
 from jinja2 import Template
 
 from datetime import datetime
-from typing import Generator
+from typing import Generator, List
 
 from source_adaptive.adaptive.base import Adaptive
 from airbyte_cdk.models import (
@@ -10,10 +10,11 @@ from airbyte_cdk.models import (
     Type,
 )
 from datetime import datetime
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 class AdaptiveExportData(Adaptive):
-
     def _generate_mapping_order_for_row(self) -> dict:
         """
         Since data is provided as csv and we read each record as list,
@@ -35,7 +36,64 @@ class AdaptiveExportData(Adaptive):
 
         return mapping_order
 
-    def construct_payload(self):
+    def _get_months_of_interest(self) -> List[str]:
+        """
+        Returns a list of all the months between start_month and end_month inclusive.
+        """
+
+        date_fmt = "%m/%Y"
+
+        # Convert the start_month and end_month strings to datetime objects
+        start_dt = datetime.strptime(self.config["method_obj"]["date_start"], date_fmt)
+        end_dt = datetime.strptime(self.config["method_obj"]["date_end"], date_fmt)
+
+        # Initialize an empty list to store the result
+        months = []
+
+        # Loop through each month between start_dt and end_dt using relativedelta
+        while start_dt <= end_dt:
+            months.append(start_dt.strftime(date_fmt))
+            start_dt += relativedelta(months=1)
+        return months
+
+    def construct_payload(self) -> Generator[str, None, None]:
+        """
+        Generate the xml that is sent to the request using jinja templating
+        """
+
+        for date_selected in self._get_months_of_interest():
+
+            TEMPLATE = """<?xml version='1.0' encoding='UTF-8'?>
+            <call method="{{method_obj["method"]}}" callerName="Airbyte - auto">
+                <credentials login="{{username}}" password="{{password}}"/>
+                <version name="{{method_obj["version"]}}" isDefault="false"/>
+                <format useInternalCodes="true" includeCodes="false" includeNames="true" displayNameEnabled="true"/>
+                <filters>
+                    <accounts>
+                        {% for acc in method_obj["accounts"] -%}
+                        <account code="{{acc}}" isAssumption="false" includeDescendants="true"/>
+                        {% endfor -%}
+                    </accounts>
+                    <timeSpan start="{{date_selected}}" end="{{date_selected}}"/>
+                </filters>
+                <dimensions>
+                    {% for dim in method_obj["dimensions"] -%}
+                    <dimension name="{{dim}}"/>
+                    {% endfor -%}
+                </dimensions>
+                <rules includeZeroRows="false" includeRollupAccounts="true" timeRollups="false">
+                    <currency override="USD"/>
+                </rules>
+            </call>"""
+
+            config_with_added_properties = self.config
+            config_with_added_properties.update({"date_selected": date_selected})
+
+            payload = Template(TEMPLATE).render(**config_with_added_properties)
+            yield payload
+
+    def construct_payload_fast(self) -> str:
+
         """
         Generate the xml that is sent to the request using jinja templating
         """
@@ -51,7 +109,7 @@ class AdaptiveExportData(Adaptive):
                     <account code="{{acc}}" isAssumption="false" includeDescendants="true"/>
                     {% endfor -%}
                 </accounts>
-                <timeSpan start="{{method_obj["date_selected"]}}" end="{{method_obj["date_selected"]}}"/>
+                <timeSpan start="{{method_obj["date_start"]}}" end="{{method_obj["date_end"]}}"/>
             </filters>
             <dimensions>
                 {% for dim in method_obj["dimensions"] -%}
@@ -92,40 +150,40 @@ class AdaptiveExportData(Adaptive):
     def generate_table_row(self) -> Generator[AirbyteMessage, None, None]:
 
         # make the request and keep the response
-        response = self.perform_request()
+        for response in self.perform_request():
+            if response is None:
+                raise ValueError
 
-        # get the mapping dor each row in csv
-        mapping_order = self._generate_mapping_order_for_row()
+            # get the mapping dor each row in csv
+            mapping_order = self._generate_mapping_order_for_row()
 
-        # get the date_selected as it will be saved for each row
-        date_selected = self.config["method_obj"]["date_selected"]
+            # get the date_selected as it will be saved for each row
+            date_selected = str(self.get_csv_columns_from_response(response)[-1])
 
-        # generate a record for each row that is read
-        for row in self.get_csv_data_from_response(response):
+            # generate a record for each row that is read
+            for row in self.get_csv_data_from_response(response):
 
-            # create the record using the mapping order, using
-            data_list = [(k, row[mapping_order[k]]) for k in mapping_order.keys()]
-            data = {k: v for k, v in data_list}
-            # the syntax might be weird but end result generated dynamically
-            # the record as airbyte expects and more or less has the following form
-            # data = {
-            # "account_name":"smth",
-            # "account_code":"smth",
-            # "level_name":"smth",
-            # "dim1":"smth",
-            # "dim2":"smth",
-            # "...":"smth",
-            # "amount.":"smth",
-            # }
+                # create the record using the mapping order, using
+                data_list = [(k, row[mapping_order[k]]) for k in mapping_order.keys()]
+                data = {k: v for k, v in data_list}
+                # the syntax might be weird but end result generated dynamically
+                # the record as airbyte expects and more or less has the following form
+                # data = {
+                # "account_name":"smth",
+                # "account_code":"smth",
+                # "level_name":"smth",
+                # "dim1":"smth",
+                # "dim2":"smth",
+                # "...":"smth",
+                # "amount.":"smth",
+                # }
 
-            # now add additional data in the record for the date,
-            data.update({"date": date_selected})
+                # now add additional data in the record for the date,
+                data.update({"date": date_selected})
 
-            yield AirbyteMessage(
-                type=Type.RECORD,
-                record=AirbyteRecordMessage(
-                    stream=self.generate_table_name(),
-                    data=data, emitted_at=int(datetime.now().timestamp()) * 1000
-                ),
-            )
-
+                yield AirbyteMessage(
+                    type=Type.RECORD,
+                    record=AirbyteRecordMessage(
+                        stream=self.generate_table_name(), data=data, emitted_at=int(datetime.now().timestamp()) * 1000
+                    ),
+                )

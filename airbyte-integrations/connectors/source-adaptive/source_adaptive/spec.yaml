@@ -35,7 +35,8 @@ connectionSpecification:
       - required:
         - method
         - version
-        - date_selected
+        - date_start
+        - date_end
         - accounts
         - dimensions
         title: export Data
@@ -52,9 +53,9 @@ connectionSpecification:
               previous-actuals: Get the second to last version that matches the pattern LBEMMYY
               prediction: Get the prediction version that matches the pattern AOPYYYY
             order: 1
-          date_selected:
+          date_start:
             type: string
-            title: Selected date
+            title: Start date
             description: >-
               From which date to retrieve data
             pattern: ^[0-9]{2}/[0-9]{4}$
@@ -62,6 +63,16 @@ connectionSpecification:
               - "%m/%Y"
             default: "01/2019"
             order: 2
+          date_end:
+            type: string
+            title: End date
+            description: >-
+              From which date to retrieve data
+            pattern: ^[0-9]{2}/[0-9]{4}$
+            examples:
+              - "%m/%Y"
+            default: "01/2019"
+            order: 3
           accounts:
             type: array
             title: Accounts
@@ -69,7 +80,7 @@ connectionSpecification:
               type: string
             description: >-
               Add the account codes 
-            order: 3
+            order: 4
           dimensions:
             type: array
             title: Dimensions
@@ -77,4 +88,4 @@ connectionSpecification:
               type: string
             description: >-
               The dimensions to retrieve
-            order: 4
+            order: 5

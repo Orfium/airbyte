@@ -49,7 +49,7 @@ class SourceAdaptive(Source):
                 return AirbyteConnectionStatus(status=Status.FAILED, message=f"method: {method} has not been implemented yet")
 
             # make the request and keep the response
-            response = adaptive_method.perform_request()
+            response = adaptive_method.perform_request_fast()
 
             if not (adaptive_method.is_request_successful(response=response)):
                 error_message = adaptive_method.get_request_error_messages(response=response)

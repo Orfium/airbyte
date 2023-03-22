@@ -13,8 +13,8 @@ from airbyte_cdk.models import (
 import csv
 import xmltodict
 from typing import Generator
-from functools import lru_cache, wraps
-from datetime import datetime, timedelta
+
+REQUEST_RETRIES_BEFORE_ERROR = 20
 
 
 def get_config_as_dict(config: json) -> dict:
@@ -30,11 +30,12 @@ class Adaptive(ABC):
     all methods that are not specifically used by one method it is advices to
     be placed here so any future method can reuse the method.
     """
+
     def __init__(self, logger: AirbyteLogger, config: json):
         self.logger = logger
-        self.config = get_config_as_dict(config=config) # save config in better format
+        self.config = get_config_as_dict(config=config)  # save config in better format
 
-    def perform_request(self):
+    def _perform_request(self, url, headers, payload) -> Response:
         """
         A Generic method to perform the request, please do not override this
         in theory you should be able to perform different kind of request
@@ -44,26 +45,21 @@ class Adaptive(ABC):
         could be implemented but reading it as text and parsing the response
         as stream but this will make the code unmantainable. So for adaptive
         it is better to be slow since the load data is not so big.
-        """
-        url = "https://api.adaptiveinsights.com/api/v32"
-        headers = {"Content-Type": "application/xml"}
 
-        # have payload ready
-        payload = self.construct_payload()
+        In addition, this is the core way to perform the request using the requests
+        package. All logic should be enclosed here for easier maintainance
+        """
 
         response = None
         counter = 0
         while response is None:
-
             counter = counter + 1
             if counter > 1:
                 self.logger.warn(f"Perform request try: {counter}")
-
             try:
-                response = requests.request("POST", url, timeout=30, headers=headers, data=payload)
-                return response
+                return requests.request("POST", url, timeout=30, headers=headers, data=payload)
             except requests.ConnectionError as e:
-                if counter > 20:
+                if counter >= REQUEST_RETRIES_BEFORE_ERROR:
                     self.logger.error(f"Tried for {counter} times and something is erronnious, abort...")
                     raise e
                 self.logger.warn("Connection error occurred", e)
@@ -79,8 +75,27 @@ class Adaptive(ABC):
                 continue
             except KeyboardInterrupt:
                 self.logger.warn("The program has been canceled")
-
         return response
+
+    def perform_request(self) -> Generator[Response, None, None]:
+        """
+        Method to be used when retrieval of all data is needed.
+        """
+        url = "https://api.adaptiveinsights.com/api/v32"
+        headers = {"Content-Type": "application/xml"}
+
+        for payload in self.construct_payload():
+            yield self._perform_request(url=url, payload=payload, headers=headers)
+
+    def perform_request_fast(self) -> Response:
+        """
+        Method to be used when a single call will be made, necessary to identify
+        the sucess of the request and/or a data sample that will be fetched.
+        """
+        url = "https://api.adaptiveinsights.com/api/v32"
+        headers = {"Content-Type": "application/xml"}
+        payload = self.construct_payload_fast()
+        return self._perform_request(url=url, payload=payload, headers=headers)
 
     def get_data_from_response(self, response: Response):
         return xmltodict.parse(response.content)["response"]["output"]
@@ -120,7 +135,20 @@ class Adaptive(ABC):
 
     # these four methods MUST be implemented by child adaptive classes
     @abstractmethod
-    def construct_payload(self) -> str:
+    def construct_payload(self) -> Generator[str, None, None]:
+        """
+        This generator, creates the various payloads that will be made to adaptive
+        in order to fetch the data.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def construct_payload_fast(self) -> str:
+        """
+        This method generates a payload, necessary to perform the handshake
+        with the adaptive and/or fetching a sample of data to identify
+        data format and such.
+        """
         raise NotImplementedError
 
     @abstractmethod

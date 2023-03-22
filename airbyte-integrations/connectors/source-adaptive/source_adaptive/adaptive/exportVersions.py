@@ -14,7 +14,10 @@ from datetime import datetime
 
 
 class AdaptiveExportVersions(Adaptive):
-    def construct_payload(self):
+    def construct_payload(self)->Generator[str,None,None]:
+        yield self.construct_payload_fast()
+
+    def construct_payload_fast(self)->str:
         """
         Generate the xml that is sent to the request using jinja templating
         """
@@ -41,16 +44,15 @@ class AdaptiveExportVersions(Adaptive):
 
     def generate_table_row(self) -> Generator[AirbyteMessage, None, None]:
 
-        # make the request and keep the response
-        response = self.perform_request()
-        respose_data = self.get_data_from_response(response)
+        for response in self.perform_request():
+            response_data = self.get_data_from_response(response)
 
-        for row in respose_data["versions"]["version"]:
-            data = {"id": row["@id"], "name": row["@name"]}
+            for row in response_data["versions"]["version"]:
+                data = {"id": row["@id"], "name": row["@name"]}
 
-            yield AirbyteMessage(
-                type=Type.RECORD,
-                record=AirbyteRecordMessage(
-                    stream=self.generate_table_name(), data=data, emitted_at=int(datetime.now().timestamp()) * 1000
-                ),
-            )
+                yield AirbyteMessage(
+                    type=Type.RECORD,
+                    record=AirbyteRecordMessage(
+                        stream=self.generate_table_name(), data=data, emitted_at=int(datetime.now().timestamp()) * 1000
+                    ),
+                )
