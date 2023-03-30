@@ -143,7 +143,7 @@ class AdaptiveExportData(Adaptive):
 
         # add an additional columns to keep the date, and the amount
         json_schema["properties"].update({"date": {"type": "string"}})
-        json_schema["properties"].update({"amount": {"type": "number"}})
+        json_schema["properties"].update({"amount": {"type": "sting"}})
         return json_schema
 
     def generate_table_row(self) -> Generator[AirbyteMessage, None, None]:
