@@ -78,7 +78,7 @@ class SourceSelectStar(Source):
             token = json.loads(json.dumps(config))["token"]
             table_url = f"{SELECT_STAR_BASE_URL}/tables/"
             headers = {"AUTHORIZATION": f"Token {token}"}
-            response = request_with_backoff(table_url, headers, logger)
+            response = requests.request("GET", table_url, headers=headers)
             if response.status_code == 200:
                 return AirbyteConnectionStatus(status=Status.SUCCEEDED)
             else:
