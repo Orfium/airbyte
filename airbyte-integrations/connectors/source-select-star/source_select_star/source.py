@@ -50,6 +50,10 @@ def request_with_backoff(url, headers, logger):
             logger.warn(e)
             sleep(3)
             continue
+        if response is not None and response.status_code != 200:
+            # should anything is unexpected, log and retry
+            logger.warn(f"error when GET {url}, status code returned {response.status_code}")
+            response = None
 
     # in the end, no matter how long, a response will be sent back
     return response
@@ -167,38 +171,43 @@ class SourceSelectStar(Source):
         headers = {"AUTHORIZATION": f"Token {token}"}
 
         while table_url is not None:
-            response = request_with_backoff(table_url, headers, logger)
-            if response.status_code == 200:
-                res = response.json()
-                for table in res["results"]:
-                    table_obj = {
-                        "guid": table["guid"],
-                        "database_name": table["database"]["name"],
-                        "schema_name": table["schema"]["name"],
-                        "table_name": table["name"],
-                    }
+            table_response = request_with_backoff(table_url, headers, logger)
+            res = table_response.json()
+            for table in res["results"]:
 
+                # create table object
+                table_obj = {
+                    "guid": table["guid"],
+                    "database_name": table["database"]["name"],
+                    "schema_name": table["schema"]["name"],
+                    "table_name": table["name"],
+                }
+
+                # and sent it
+                yield AirbyteMessage(
+                    type=Type.RECORD,
+                    record=AirbyteRecordMessage(stream="table", data=table_obj, emitted_at=int(datetime.now().timestamp()) * 1000),
+                )
+
+                # get lineage for each table
+                lineage_url = f"{SELECT_STAR_BASE_URL}/{table_obj['guid']}/?max_depth=1&direction=right&mode=table"
+                lineage_response = request_with_backoff(lineage_url, headers, logger)
+                lineage = lineage_response.json()
+
+                # form connections
+                target_table_guid = []
+                for lin in lineage["table_lineage"]:
+                    target_table_guid.extend(lin["target_table_guids"])
+
+                # and for each conenction found sent it
+                for target_guid in target_table_guid:
+                    data = {"guid": table_obj["guid"], "target_guid": target_guid}
                     yield AirbyteMessage(
                         type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream="table", data=table_obj, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
                     )
 
-                    lineage_url = f"{SELECT_STAR_BASE_URL}/{table_obj['guid']}/?max_depth=1&direction=right&mode=table"
-                    response = request_with_backoff(lineage_url, headers, logger)
-
-                    if response.status_code == 200:
-                        lineage = response.json()
-                        target_table_guid = []
-                        for lin in lineage["table_lineage"]:
-                            target_table_guid.extend(lin["target_table_guids"])
-
-                        for target_guid in target_table_guid:
-                            data = {"guid": table_obj["guid"], "target_guid": target_guid}
-                            yield AirbyteMessage(
-                                type=Type.RECORD,
-                                record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                            )
-
+                # visit next page since tables is paginated
                 next_page = res["next"]
 
                 # visit the next page
