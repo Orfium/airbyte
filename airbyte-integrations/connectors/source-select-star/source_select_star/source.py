@@ -31,6 +31,7 @@ def request_with_backoff(url, headers, logger):
     response = None
     backoff_time = 1
     retries = 0
+    logger.info(f"Perform a GET on {url}")
     while response is None:
         try:
             response = requests.request("GET", url, headers=headers)
@@ -215,8 +216,8 @@ class SourceSelectStar(Source):
                         record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
                     )
 
-                # visit next page since tables is paginated
-                next_page = res["next"]
+            # visit next page since tables is paginated
+            next_page = res["next"]
 
-                # visit the next page
-                table_url = next_page
+            # visit the next page
+            table_url = next_page
