@@ -116,6 +116,10 @@ class SourceSelectStar(Source):
                 "database_name": {"type": "string"},
                 "schema_name": {"type": "string"},
                 "table_name": {"type": "string"},
+                "description": {"type": "string"},
+                "business_owner": {"type": "string"},
+                "technical_owner": {"type": "string"},
+                "row_count": {"type": "integer"},
             },
         }
         streams.append(
@@ -181,6 +185,10 @@ class SourceSelectStar(Source):
                     "database_name": table["database"]["name"],
                     "schema_name": table["schema"]["name"],
                     "table_name": table["name"],
+                    "description": table["description"],
+                    "business_owner": table["business_owner"],
+                    "technical_owner": table["technical_owner"],
+                    "row_count": table["row_count"],
                 }
 
                 # and sent it
@@ -190,7 +198,7 @@ class SourceSelectStar(Source):
                 )
 
                 # get lineage for each table
-                lineage_url = f"{SELECT_STAR_BASE_URL}/{table_obj['guid']}/?max_depth=1&direction=right&mode=table"
+                lineage_url = f"{SELECT_STAR_BASE_URL}/lineage/{table_obj['guid']}/?max_depth=1&direction=right&mode=table"
                 lineage_response = request_with_backoff(lineage_url, headers, logger)
                 lineage = lineage_response.json()
 
