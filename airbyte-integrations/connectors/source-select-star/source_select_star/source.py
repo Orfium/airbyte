@@ -210,11 +210,12 @@ class SourceSelectStar(Source):
 
                 # and for each conenction found sent it
                 for target_guid in target_table_guid:
-                    data = {"guid": table_obj["guid"], "target_guid": target_guid}
-                    yield AirbyteMessage(
-                        type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                    )
+                    if table_obj["guid"] != target_guid: # exclude self-references
+                        data = {"guid": table_obj["guid"], "target_guid": target_guid}
+                        yield AirbyteMessage(
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        )
 
             # visit next page since tables is paginated
             next_page = res["next"]
