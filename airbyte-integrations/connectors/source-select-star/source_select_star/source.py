@@ -136,7 +136,7 @@ class SourceSelectStar(Source):
         json_schema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
-            "properties": {"guid": {"type": "string"}, "target_guid": {"type": "string"}},
+            "properties": {"guid": {"type": "string"}, "target_guid": {"type": "string"}, "target_object_type": {"type": "string"}},
         }
         streams.append(
             AirbyteStream(
@@ -205,13 +205,17 @@ class SourceSelectStar(Source):
 
                 # form connections
                 target_table_guid = []
+
+                # also construct the object type for each target_guid found
+                target_object_types = {}
                 for lin in lineage["table_lineage"]:
                     target_table_guid.extend(lin["target_table_guids"])
+                    target_object_types[lin["key"]] = lin["object_type"]
 
                 # and for each conenction found sent it
                 for target_guid in target_table_guid:
-                    if table_obj["guid"] != target_guid: # exclude self-references
-                        data = {"guid": table_obj["guid"], "target_guid": target_guid}
+                    if table_obj["guid"] != target_guid:  # exclude self-references
+                        data = {"guid": table_obj["guid"], "target_guid": target_guid, "target_object_type": target_object_types[target_guid]}
                         yield AirbyteMessage(
                             type=Type.RECORD,
                             record=AirbyteRecordMessage(stream="lineage", data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
