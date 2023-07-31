@@ -88,9 +88,9 @@ class AdaptiveExportDimensions(Adaptive):
                                     "value_description": value.get("@description"),
                                     "value_short_name": value.get("@shortName"),
                                     "attribute_id": attribute.get("@attributeId"),
-                                    "attribute_value": attribute.get("@namej"),
                                     "attribute_value_id": attribute.get("@valueId"),
                                     "attribute_value": attribute.get("@value"),
+                                    "attribute_name": attribute.get("@name"),
                                     "version": version,
                                 }
 
