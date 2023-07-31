@@ -24,6 +24,7 @@ class AdaptiveExportAccounts(Adaptive):
 
         TEMPLATE = """<?xml version='1.0' encoding='UTF-8'?>
         <call method="{{method_obj["method"]}}" callerName="Airbyte - auto">
+            <include versionName="{{method_obj["version"]}}" inaccessibleValues="true"/>
             <credentials login="{{username}}" password="{{password}}"/>
         </call>"""
 
@@ -31,7 +32,8 @@ class AdaptiveExportAccounts(Adaptive):
         return payload
 
     def generate_table_name(self):
-        return "exportAccounts"
+        return "exportAccounts" + "_" + self.config["method_obj"]["version"]
+
 
     def generate_table_schema(self):
         json_schema = {
@@ -76,6 +78,7 @@ class AdaptiveExportAccounts(Adaptive):
                 "parent_id": {"type": "string"},
                 "parent_code": {"type": "string"},
                 "parent_name": {"type": "string"},
+                "version": {"type": "string"},
             },
         }
 
@@ -105,45 +108,48 @@ class AdaptiveExportAccounts(Adaptive):
 
     def parse_account_row(self, data_obj, parent_obj):
 
+        version = self.config["method_obj"]["version"]
+
         data = {
-            "id": data_obj.get("@id",""),
-            "name": data_obj.get("@name",""),
-            "code": data_obj.get("@code",""),
-            "description": data_obj.get("@description",""),
-            "timeStratum": data_obj.get("@timeStratum",""),
-            "displayAs": data_obj.get("@displayAs",""),
-            "accountTypeCode": data_obj.get("@accountTypeCode",""),
-            "decimalPrecision": data_obj.get("@decimalPrecision",""),
-            "isAssumption": data_obj.get("@isAssumption",""),
-            "suppressZeroes": data_obj.get("@suppressZeroes",""),
-            "isDefaultRoot": data_obj.get("@isDefaultRoot",""),
-            "shortName": data_obj.get("@shortName",""),
-            "exchangeRateType": data_obj.get("@exchangeRateType",""),
-            "balanceType": data_obj.get("@balanceType",""),
-            "isLinked": data_obj.get("@isLinked",""),
-            "owningSheetId": data_obj.get("@owningSheetId",""),
-            "isSystem": data_obj.get("@isSystem",""),
-            "isIntercompany": data_obj.get("@isIntercompany",""),
-            "dataEntryType": data_obj.get("@dataEntryType",""),
-            "planBy": data_obj.get("@planBy",""),
-            "actualsBy": data_obj.get("@actualsBy",""),
-            "timeRollup": data_obj.get("@timeRollup",""),
-            "timeWeightAcctId": data_obj.get("@timeWeightAcctId",""),
-            "levelDimRollup": data_obj.get("@levelDimRollup",""),
-            "levelDimWeightAcctId": data_obj.get("@levelDimWeightAcctId",""),
-            "rollupText": data_obj.get("@rollupText",""),
-            "startExpanded": data_obj.get("@startExpanded",""),
-            "hasSalaryDetail": data_obj.get("@hasSalaryDetail",""),
-            "dataPrivacy": data_obj.get("@dataPrivacy",""),
-            "isBreakbackEligible": data_obj.get("@isBreakbackEligible",""),
-            "subType": data_obj.get("@subType",""),
-            "enableActuals": data_obj.get("@enableActuals",""),
-            "isGroup": data_obj.get("@isGroup",""),
-            "hasFormula": data_obj.get("@hasFormula",""),
+            "id": data_obj.get("@id"),
+            "name": data_obj.get("@name"),
+            "code": data_obj.get("@code"),
+            "description": data_obj.get("@description"),
+            "timeStratum": data_obj.get("@timeStratum"),
+            "displayAs": data_obj.get("@displayAs"),
+            "accountTypeCode": data_obj.get("@accountTypeCode"),
+            "decimalPrecision": data_obj.get("@decimalPrecision"),
+            "isAssumption": data_obj.get("@isAssumption"),
+            "suppressZeroes": data_obj.get("@suppressZeroes"),
+            "isDefaultRoot": data_obj.get("@isDefaultRoot"),
+            "shortName": data_obj.get("@shortName"),
+            "exchangeRateType": data_obj.get("@exchangeRateType"),
+            "balanceType": data_obj.get("@balanceType"),
+            "isLinked": data_obj.get("@isLinked"),
+            "owningSheetId": data_obj.get("@owningSheetId"),
+            "isSystem": data_obj.get("@isSystem"),
+            "isIntercompany": data_obj.get("@isIntercompany"),
+            "dataEntryType": data_obj.get("@dataEntryType"),
+            "planBy": data_obj.get("@planBy"),
+            "actualsBy": data_obj.get("@actualsBy"),
+            "timeRollup": data_obj.get("@timeRollup"),
+            "timeWeightAcctId": data_obj.get("@timeWeightAcctId"),
+            "levelDimRollup": data_obj.get("@levelDimRollup"),
+            "levelDimWeightAcctId": data_obj.get("@levelDimWeightAcctId"),
+            "rollupText": data_obj.get("@rollupText"),
+            "startExpanded": data_obj.get("@startExpanded"),
+            "hasSalaryDetail": data_obj.get("@hasSalaryDetail"),
+            "dataPrivacy": data_obj.get("@dataPrivacy"),
+            "isBreakbackEligible": data_obj.get("@isBreakbackEligible"),
+            "subType": data_obj.get("@subType"),
+            "enableActuals": data_obj.get("@enableActuals"),
+            "isGroup": data_obj.get("@isGroup"),
+            "hasFormula": data_obj.get("@hasFormula"),
             "attributes": self.parse_attributes(data_obj.get("attributes","")),
-            "parent_id": parent_obj.get("parent_id",""),
-            "parent_code": parent_obj.get("parent_code",""),
-            "parent_name": parent_obj.get("parent_name",""),
+            "version": version,
+            "parent_id": parent_obj.get("parent_id"),
+            "parent_code": parent_obj.get("parent_code"),
+            "parent_name": parent_obj.get("parent_name"),
         }
         # create a list of airbyte_messages
 
