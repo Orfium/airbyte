@@ -110,8 +110,6 @@ class AdaptiveExportAccounts(Adaptive):
 
         version = self.config["method_obj"]["version"]
 
-        print(data_obj)
-
         data = {
             "id": data_obj.get("@id"),
             "name": data_obj.get("@name"),
